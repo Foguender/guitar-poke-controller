@@ -28,7 +28,6 @@
         async function startListening() {
             if (isRunning) return;
             try {
-                // Pede permissão para usar o microfone do celular
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioCtx.createAnalyser();
@@ -48,7 +47,6 @@
         }
 
         function autoCorrelate(buffer, sampleRate) {
-            // Algoritmo simples de detecção de frequência (Pitch)
             let SIZE = buffer.length;
             let sumOfSquares = 0;
             for (let i = 0; i < SIZE; i++) {
@@ -56,7 +54,7 @@
                 sumOfSquares += val * val;
             }
             let rootMeanSquare = Math.sqrt(sumOfSquares / SIZE);
-            if (rootMeanSquare < 0.01) return -1; // Muito silêncio
+            if (rootMeanSquare < 0.01) return -1;
 
             let r1 = 0, r2 = SIZE - 1, thres = 0.2;
             for (let i = 0; i < SIZE / 2; i++) {
@@ -89,26 +87,46 @@
             return sampleRate / T0;
         }
 
+        function getNoteName(freq) {
+            // Frequências aproximadas das cordas da guitarra
+            const notes = [
+                { name: "Mi Grave (E2)", freq: 82.41 },
+                { name: "Lá (A2)", freq: 110.00 },
+                { name: "Ré (D3)", freq: 146.83 },
+                { name: "Sol (G3)", freq: 196.00 },
+                { name: "Si (B3)", freq: 246.94 },
+                { name: "Mi Agudo (E4)", freq: 329.63 }
+            ];
+
+            let closest = notes[0];
+            let minDiff = Math.abs(freq - closest.freq);
+
+            for (let i = 1; i < notes.length; i++) {
+                let diff = Math.abs(freq - notes[i].freq);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = notes[i];
+                }
+            }
+
+            // Se a diferença for aceitável, retorna o nome da nota
+            if (minDiff < 15) {
+                return `${closest.name} (${freq.toFixed(1)} Hz)`;
+            }
+            return `Frequência: ${freq.toFixed(1)} Hz`;
+        }
+
         function detectPitch() {
             let buffer = new Float32Array(analyser.fftSize);
             analyser.getFloatTimeDomainData(buffer);
             let freq = autoCorrelate(buffer, audioCtx.sampleRate);
 
             if (freq !== -1) {
-                // Mapeamento aproximado para notas da guitarra
-                let noteName = getNoteFromFrequency(freq);
-                document.getElementById("note.innerHTML").innerText = `${noteName} (${freq.toFixed(1)} Hz)`;
-                
-                // AQUI É ONDE A MÁGICA DO COMANDO ACONTECE:
-                // Você pode vincular a nota detectada a uma tecla do teclado virtual para o DeX
+                let resultText = getNoteName(freq);
+                document.getElementById("note").innerText = resultText;
             }
             
             requestAnimationFrame(detectPitch);
-        }
-
-        function getNoteNames(frequency) {
-            // Apenas para exibição visual por enquanto
-            return "Nota detectada";
         }
     </script>
 </body>
