@@ -6,6 +6,7 @@
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; margin-top: 50px; }
         #note { font-size: 48px; color: #4CAF50; margin: 20px; font-weight: bold; }
+        #action { font-size: 24px; color: #ff9800; margin: 10px; }
         button { padding: 15px 30px; font-size: 18px; background: #ff5722; color: white; border: none; border-radius: 8px; cursor: pointer; }
         button:hover { background: #e64a19; }
     </style>
@@ -13,17 +14,19 @@
 <body>
 
     <h1>🎮 Controle de Guitarra para Pokémon FireRed</h1>
-    <p>Toque uma corda na caixa de som para o S21 escutar!</p>
+    <p>Toque uma corda para enviar comandos para o jogo!</p>
     
     <button onclick="startListening()">Ligar Escuta do Microfone</button>
     
     <div id="note">Aguardando som...</div>
+    <div id="action">Nenhuma ação</div>
 
     <script>
         let audioCtx;
         let analyser;
         let microphone;
         let isRunning = false;
+        let lastTriggerTime = 0;
 
         async function startListening() {
             if (isRunning) return;
@@ -87,15 +90,15 @@
             return sampleRate / T0;
         }
 
-        function getNoteName(freq) {
-            // Frequências aproximadas das cordas da guitarra
+        function getNoteAndAction(freq) {
+            // Mapeando cada corda/frequência para uma tecla do GBA
             const notes = [
-                { name: "Mi Grave (E2)", freq: 82.41 },
-                { name: "Lá (A2)", freq: 110.00 },
-                { name: "Ré (D3)", freq: 146.83 },
-                { name: "Sol (G3)", freq: 196.00 },
-                { name: "Si (B3)", freq: 246.94 },
-                { name: "Mi Agudo (E4)", freq: 329.63 }
+                { name: "Mi Grave (E2)", freq: 82.41, key: "ArrowUp", action: "Cima ⬆️" },
+                { name: "Lá (A2)", freq: 110.00, key: "ArrowDown", action: "Baixo ⬇️" },
+                { name: "Ré (D3)", freq: 146.83, key: "ArrowLeft", action: "Esquerda ⬅️" },
+                { name: "Sol (G3)", freq: 196.00, key: "ArrowRight", action: "Direita ➡️" },
+                { name: "Si (B3)", freq: 246.94, key: "KeyX", action: "Botão A (Confirmar) 🅰️" },
+                { name: "Mi Agudo (E4)", freq: 329.63, key: "KeyZ", action: "Botão B (Voltar) 🅱️" }
             ];
 
             let closest = notes[0];
@@ -109,11 +112,26 @@
                 }
             }
 
-            // Se a diferença for aceitável, retorna o nome da nota
             if (minDiff < 15) {
-                return `${closest.name} (${freq.toFixed(1)} Hz)`;
+                return { text: `${closest.name} (${freq.toFixed(1)} Hz)`, actionText: closest.action, key: closest.key };
             }
-            return `Frequência: ${freq.toFixed(1)} Hz`;
+            return null;
+        }
+
+        function simulateKeyPress(keyCode) {
+            let now = Date.now();
+            // Evita disparar a mesma tecla repetidamente sem parar (cooldown de 400ms)
+            if (now - lastTriggerTime < 400) return;
+            lastTriggerTime = now;
+
+            console.log("Simulando tecla:", keyCode);
+            
+            // Dispara o evento de pressionar tecla na página
+            document.dispatchEvent(new KeyboardEvent('keydown', { code: keyCode, bubbles: true }));
+            
+            setTimeout(() => {
+                document.dispatchEvent(new KeyboardEvent('keyup', { code: keyCode, bubbles: true }));
+            }, 100);
         }
 
         function detectPitch() {
@@ -122,8 +140,12 @@
             let freq = autoCorrelate(buffer, audioCtx.sampleRate);
 
             if (freq !== -1) {
-                let resultText = getNoteName(freq);
-                document.getElementById("note").innerText = resultText;
+                let result = getNoteAndAction(freq);
+                if (result) {
+                    document.getElementById("note").innerText = result.text;
+                    document.getElementById("action").innerText = `Ação: ${result.actionText}`;
+                    simulateKeyPress(result.key);
+                }
             }
             
             requestAnimationFrame(detectPitch);
