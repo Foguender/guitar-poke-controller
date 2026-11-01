@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Guitar to Game Control</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; margin-top: 50px; }
+        #note { font-size: 48px; color: #4CAF50; margin: 20px; font-weight: bold; }
+        button { padding: 15px 30px; font-size: 18px; background: #ff5722; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        button:hover { background: #e64a19; }
+    </style>
+</head>
+<body>
+
+    <h1>🎮 Controle de Guitarra para Pokémon FireRed</h1>
+    <p>Toque uma corda na caixa de som para o S21 escutar!</p>
+    
+    <button onclick="startListening()">Ligar Escuta do Microfone</button>
+    
+    <div id="note">Aguardando som...</div>
+
+    <script>
+        let audioCtx;
+        let analyser;
+        let microphone;
+        let isRunning = false;
+
+        async function startListening() {
+            if (isRunning) return;
+            try {
+                // Pede permissão para usar o microfone do celular
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                microphone = audioCtx.createMediaStreamSource(stream);
+                
+                analyser.fftSize = 2048;
+                microphone.connect(analyser);
+                
+                isRunning = true;
+                document.querySelector("button").style.display = "none";
+                document.getElementById("note").innerText = "Ouvindo...";
+                
+                detectPitch();
+            } catch (err) {
+                alert("Erro ao acessar o microfone: " + err);
+            }
+        }
+
+        function autoCorrelate(buffer, sampleRate) {
+            // Algoritmo simples de detecção de frequência (Pitch)
+            let SIZE = buffer.length;
+            let sumOfSquares = 0;
+            for (let i = 0; i < SIZE; i++) {
+                let val = buffer[i];
+                sumOfSquares += val * val;
+            }
+            let rootMeanSquare = Math.sqrt(sumOfSquares / SIZE);
+            if (rootMeanSquare < 0.01) return -1; // Muito silêncio
+
+            let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+            for (let i = 0; i < SIZE / 2; i++) {
+                if (Math.abs(buffer[i]) < thres) { r1 = i; break; }
+            }
+            for (let i = 1; i < SIZE / 2; i++) {
+                if (Math.abs(buffer[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+            }
+
+            buffer = buffer.slice(r1, r2);
+            SIZE = buffer.length;
+
+            let c = new Array(SIZE).fill(0);
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE - i; j++) {
+                    c[i] = c[i] + buffer[j] * buffer[j + i];
+                }
+            }
+
+            let d = 0;
+            while (c[d] > c[d + 1]) d++;
+            let maxval = -1, maxpos = -1;
+            for (let i = d; i < SIZE; i++) {
+                if (c[i] > maxval) {
+                    maxval = c[i];
+                    maxpos = i;
+                }
+            }
+            let T0 = maxpos;
+            return sampleRate / T0;
+        }
+
+        function detectPitch() {
+            let buffer = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(buffer);
+            let freq = autoCorrelate(buffer, audioCtx.sampleRate);
+
+            if (freq !== -1) {
+                // Mapeamento aproximado para notas da guitarra
+                let noteName = getNoteFromFrequency(freq);
+                document.getElementById("note.innerHTML").innerText = `${noteName} (${freq.toFixed(1)} Hz)`;
+                
+                // AQUI É ONDE A MÁGICA DO COMANDO ACONTECE:
+                // Você pode vincular a nota detectada a uma tecla do teclado virtual para o DeX
+            }
+            
+            requestAnimationFrame(detectPitch);
+        }
+
+        function getNoteNames(frequency) {
+            // Apenas para exibição visual por enquanto
+            return "Nota detectada";
+        }
+    </script>
+</body>
+</html>
