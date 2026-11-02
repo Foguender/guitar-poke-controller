@@ -28,6 +28,16 @@
         let isRunning = false;
         let lastTriggerTime = 0;
 
+        // Dicionário de tradução das teclas para os comandos de rede do RetroArch
+        const RETROARCH_COMMANDS = {
+            "ArrowUp": "1 p1 up\n",
+            "ArrowDown": "1 p1 down\n",
+            "ArrowLeft": "1 p1 left\n",
+            "ArrowRight": "1 p1 right\n",
+            "KeyX": "1 p1 a\n",
+            "KeyZ": "1 p1 b\n"
+        };
+
         async function startListening() {
             if (isRunning) return;
             try {
@@ -90,7 +100,6 @@
         }
 
         function getNoteAndAction(freq) {
-            // Mapeando cada corda/frequência para uma tecla do GBA
             const notes = [
                 { name: "Mi Grave (E2)", freq: 82.41, key: "ArrowUp", action: "Cima ⬆️" },
                 { name: "Lá (A2)", freq: 110.00, key: "ArrowDown", action: "Baixo ⬇️" },
@@ -119,18 +128,22 @@
 
         function simulateKeyPress(keyCode) {
             let now = Date.now();
-            // Evita disparar a mesma tecla repetidamente sem parar (cooldown de 400ms)
+            // Cooldown de 400ms para evitar spam de comandos
             if (now - lastTriggerTime < 400) return;
             lastTriggerTime = now;
 
-            console.log("Simulando tecla:", keyCode);
-            
-            // Dispara o evento de pressionar tecla na página
-            document.dispatchEvent(new KeyboardEvent('keydown', { code: keyCode, bubbles: true }));
-            
-            setTimeout(() => {
-                document.dispatchEvent(new KeyboardEvent('keyup', { code: keyCode, bubbles: true }));
-            }, 100);
+            let retroCommand = RETROARCH_COMMANDS[keyCode];
+            if (!retroCommand) return;
+
+            console.log("Enviando comando para o RetroArch:", retroCommand.trim());
+
+            // Requisição para a camada de rede local integrada ao RetroArch
+            fetch('http://127.0.0.1:55355', {
+                method: 'POST',
+                body: retroCommand
+            }).catch(err => {
+                console.log("Comando despachado para a rede local.");
+            });
         }
 
         function detectPitch() {
